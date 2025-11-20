@@ -1,0 +1,238 @@
+
+# Config Folders :
+#   noise: clip_noise_TA
+#   poison: clip_poison_TA
+
+clip_models:
+  MNIST:
+    ho_2:
+      symmetric:
+        10: 'config37'
+        20: 'config38'
+        40: 'config39'
+        60: 'config40'
+        80: 'config41'
+      poison: 
+        2: 'config1'
+        10: 'config8'
+        20: 'config9'
+    ho_10:
+      symmetric:
+        10: 'config25'
+        20: 'config24'
+        40: 'config3'
+        60: 'config23'
+        80: 'config13'
+      # asymmetric:
+      #   40: 'config20'
+
+  CIFAR10:
+    ho_2:
+      symmetric:
+        10: 'config32'
+        20: 'config30'
+        40: 'config26'
+        60: 'config28'
+        80: 'config35'
+      asymmetric:
+        20: 'config44'
+        40: 'config42'
+      poison: 
+        2: 'config2'
+        10: 'config6'
+        20: 'config4'
+
+
+    ho_10:
+      symmetric:
+        10: 'config16'
+        20: 'config14'
+        40: 'config1'
+        60: 'config11'
+        80: 'config21'
+      asymmetric:
+        40: 'config18'
+
+  CIFAR100:
+    ho_2:
+      symmetric:
+        10: 'config34'
+        20: 'config31'
+        40: 'config27'
+        60: 'config29'
+        80: 'config36'
+      asymmetric:
+        20: 'config45'
+        40: 'config43'
+      poison: 
+        2: 'config3'
+        10: 'config7'
+        20: 'config5'
+
+    ho_10:
+      symmetric:
+        10: 'config17'
+        20: 'config15'
+        40: 'config2'
+        60: 'config12'
+        80: 'config22'
+      asymmetric:
+        40: 'config19'
+
+
+# Config Folders :
+#   noise: dino_noise_TA
+#   poison: dino_poison_TA
+DINO:
+  MNIST:
+    ho_2:
+      symmetric:
+        40: 'config3'
+      # asymmetric: 
+      #   40: 
+      # poison:
+      #   2:
+  CIFAR10:
+    ho_2:
+      symmetric:
+        40: 'config1'
+      asymmetric:
+        40: 'config4'
+      poison: 
+        2: 'config1'
+        10: 'config3'
+        20: 'config4'
+  CIFAR100:
+    ho_2:
+      symmetric:
+        40: 'config2'
+      asymmetric:
+        40: 'config5'
+      poison:
+        2: 'config2'
+        10: 'config5'
+        20: 'config6'
+
+
+
+# Config Folders :
+#   noise: regular_noise_TA
+#   poison: regular_poison_TA
+regular_models:
+  MNIST:
+    scratch:
+      ho_2:
+        symmetric:
+          fc1:
+            10: 'config16'
+            20: 'config17'
+            40: 'config18'
+            60: 'config19'
+            80: 'config20'
+        asymmetric:
+          fc1:
+            20: 'config45'
+            40: 'config31'
+        poison:
+          resnet18:
+            2: 'config4'
+            10: 'config6' 
+            20: 'config7' 
+
+
+  CIFAR10:
+    scratch:
+      ho_2:
+        symmetric:
+          resnet18:
+            10: 'config21'
+            20: 'config22'
+            40: 'config23'
+            60: 'config24'
+            80: 'config25'
+          resnet34:
+            40: 'config35'
+          resnet50:
+            40: 'config37'
+          resnet101:
+            40: 'config39'
+        asymmetric:
+          resnet18:
+            20: 'config44'
+            40: 'config32'
+        poison:
+          resnet18: 
+            2: 'config2'
+            10: 'config8' 
+            20: 'config9'
+
+    pretrained:
+      ho_2:
+        symmetric:
+          resnet18:
+            40: 'config34'
+          resnet34:
+            40: 'config36'
+          resnet50:
+            40: 'config38'
+          resnet50v2: # ImagenetV2
+            40: 'config41'
+          resnet101:
+            40: 'config40'
+          resnet101v2: # ImagenetV2
+            40: 'config42'
+          vit:
+            10: 'config13'
+            20: 'config1'
+            40: 'config2'
+            60: 'config5'
+            80: 'config11'
+        asymmetric:
+          vit:
+            20: 'config7'
+            40: 'config8'
+
+        poison:
+          vit: 
+            2: 'config1'
+            10: 'config12' 
+            20: 'config13' 
+
+  CIFAR100:
+    scratch:
+      ho_2:
+        symmetric:
+          resnet18:
+            10: 'config26'
+            20: 'config27'
+            40: 'config28'
+            60: 'config29'
+            80: 'config30'
+        asymmetric:
+          resnet18:
+            20: 'config43'
+            40: 'config33'
+        poison:
+          resnet18: 
+            2: 'config3'
+            10: 'config10' 
+            20: 'config11' 
+    pretrained:
+      ho_2:
+        symmetric:
+          vit:
+            10: 'config14'
+            20: 'config3'
+            40: 'config4'
+            60: 'config6'
+            80: 'config12'
+        asymmetric:
+          vit:
+            20: 'config9'
+            40: 'config10'
+        
+        poison:
+          vit: 
+            2: 'config5'
+            10: 'config14' 
+            20: 'config15' 

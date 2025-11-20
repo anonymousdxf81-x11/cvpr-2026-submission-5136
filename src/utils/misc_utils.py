@@ -1,0 +1,737 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
+import pandas as pd
+import torch
+from PIL import Image
+import io
+import collections
+
+import os
+from tqdm import tqdm
+import requests
+
+import hashlib
+
+
+
+import logging
+import colorama
+from colorama import Fore, Style
+import seaborn as sns
+
+colorama.init()
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": Fore.BLUE,
+        "INFO": Fore.GREEN,
+        "WARNING": Fore.YELLOW,
+        "ERROR": Fore.RED,
+        "CRITICAL": Fore.RED + Style.BRIGHT
+    }
+
+    def format(self, record):
+        log_color = self.COLORS.get(record.levelname, Fore.WHITE)
+        log_message = super().format(record)
+        return f"{log_color}{log_message}{Style.RESET_ALL}"
+
+
+def img_is_color(img):
+
+    if len(img.shape) == 3:
+        # Check the color channels to see if they're all the same.
+        c1, c2, c3 = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+        if (c1 == c2).all() and (c2 == c3).all():
+            return True
+
+    return False
+
+
+
+
+def plot_plt_table(
+    main_title: str,
+    footer: str = "",
+    fig_bg_color: str = "white",
+    fig_brd_color: str = "steelblue",
+    column_titles: list[str] = [],
+    row_titles: list[str] = [],
+    data: list = [],
+):
+
+    # Table data needs to be non-numeric text.
+    cell_text = []
+    for row in data:
+        formatted_row = []
+        for x in row:
+            if x % 1 == 0:  # Check if the value is an integer
+                formatted_row.append(f"{x:.0f}")  # Show as an integer
+            else:  # If it's a float
+                formatted_row.append(f"{x:.3f}")  # Show with 3-digit precision
+        cell_text.append(formatted_row)
+    # Get some lists of color specs for row and column headers
+    rcolors = plt.cm.BuPu(np.full(len(row_titles), 0.1))
+    ccolors = plt.cm.BuPu(np.full(len(column_titles), 0.1))
+
+    # Dynamically calculate figure size
+    num_rows = len(row_titles)
+    num_cols = len(column_titles)
+    cell_height = 0.5  # Approximate height of each cell
+    cell_width = 1.5  # Approximate width of each cell
+    fig_width = num_cols * cell_width
+    fig_height = num_rows * cell_height + 1  # Add space for title and footer
+
+    plt.figure(
+        linewidth=2,
+        edgecolor=fig_brd_color,
+        facecolor=fig_bg_color,
+        figsize=(fig_width, fig_height),
+        tight_layout={"pad": 1},
+    )
+
+    # Add a table at the bottom of the axes
+    the_table = plt.table(
+        cellText=cell_text,
+        rowLabels=row_titles,
+        rowColours=rcolors,
+        rowLoc="right",
+        colColours=ccolors,
+        colLabels=column_titles,
+        loc="center",
+    )
+    # Center-align the text in all cells
+    for key, cell in the_table.get_celld().items():
+        cell.set_text_props(ha="center", va="center")
+
+    # Scale the table to fit the figure
+    the_table.scale(1, 1.5)
+
+    # Hide axes
+    ax = plt.gca()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    # Hide axes border
+    plt.box(on=None)
+
+    # Adjust title and footer dynamically
+    plt.subplots_adjust(top=0.85, bottom=0.15)  # Adjust top and bottom margins
+    plt.suptitle(main_title, y=0.95)  # Dynamically position the title
+    plt.figtext(0.5, 0.05, footer, horizontalalignment="center", size=6, weight="light")
+
+    # Force the figure to update, so backends center objects correctly within the figure.
+    plt.draw()
+    # Create image. plt.savefig ignores figure edge and face colors, so map them.
+    plt.show()
+    # fig = plt.gcf()
+    # plt.savefig(
+    #     "pyplot-table-demo.png",
+    #     # bbox='tight',
+    #     edgecolor=fig.get_edgecolor(),
+    #     facecolor=fig.get_facecolor(),
+    #     dpi=150,
+    # )
+
+
+def plot_pandas_df():
+    fig, ax = plt.subplots()
+
+    # hide axes
+    fig.patch.set_visible(False)
+    ax.axis("off")
+    ax.axis("tight")
+
+    df = pd.DataFrame(np.random.randn(10, 4), columns=list("ABCD"))
+
+    ax.table(cellText=df.values, colLabels=df.columns, loc="center")
+
+    fig.tight_layout()
+
+    plt.show()
+
+
+def show_image_list(
+    list_images,
+    list_titles=None,
+    list_cmaps=None,
+    grid=True,
+    num_cols=2,
+    figsize=(20, 10),
+    title_fontsize=30,
+):
+    """
+    Shows a grid of images, where each image is a Numpy array. The images can be either
+    RGB or grayscale.
+    Parameters:
+    ----------
+    images: list
+        List of the images to be displayed.
+    list_titles: list or None
+        Optional list of titles to be shown for each image.
+    list_cmaps: list or None
+        Optional list of cmap values for each image. If None, then cmap will be
+        automatically inferred.
+    grid: boolean
+        If True, show a grid over each image
+    num_cols: int
+        Number of columns to show.
+    figsize: tuple of width, height
+        Value to be passed to pyplot.figure()
+    title_fontsize: int
+        Value to be passed to set_title().
+    """
+
+    assert isinstance(list_images, list)
+    assert len(list_images) > 0
+    assert isinstance(list_images[0], np.ndarray)
+
+    if list_titles is not None:
+        assert isinstance(list_titles, list)
+        assert len(list_images) == len(list_titles), "%d imgs != %d titles" % (
+            len(list_images),
+            len(list_titles),
+        )
+
+    if list_cmaps is not None:
+        assert isinstance(list_cmaps, list)
+        assert len(list_images) == len(list_cmaps), "%d imgs != %d cmaps" % (
+            len(list_images),
+            len(list_cmaps),
+        )
+
+    num_images = len(list_images)
+    num_cols = min(num_images, num_cols)
+    num_rows = int(num_images / num_cols) + (1 if num_images % num_cols != 0 else 0)
+
+    # Create a grid of subplots.
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
+
+    # Create list of axes for easy iteration.
+    if isinstance(axes, np.ndarray):
+        list_axes = list(axes.flat)
+    else:
+        list_axes = [axes]
+
+    for i in range(num_images):
+
+        img = list_images[i]
+        title = list_titles[i] if list_titles is not None else "Image %d" % (i)
+        cmap = (
+            list_cmaps[i]
+            if list_cmaps is not None
+            else (None if img_is_color(img) else "gray")
+        )
+
+        list_axes[i].imshow(img, cmap=cmap)
+        list_axes[i].set_title(title, fontsize=title_fontsize)
+        list_axes[i].grid(grid)
+
+    for i in range(num_images, len(list_axes)):
+        list_axes[i].set_visible(False)
+
+    fig.tight_layout()
+    _ = plt.show()
+
+
+def show_image_categories(img_list, categories):
+    assert isinstance(img_list, list)
+    assert len(img_list) > 0
+    assert isinstance(img_list[0], np.ndarray)
+
+    NUM_SAMPLES = len(img_list)
+    NUM_COLUMNS = len(categories)
+    NUM_ROWS = int(NUM_SAMPLES / NUM_COLUMNS)
+
+    fig = plt.figure(figsize=(10, 10))
+    grid = ImageGrid(fig, 111, nrows_ncols=(NUM_ROWS, NUM_COLUMNS), axes_pad=0.05)
+
+    for category_id, category in enumerate(categories):
+        i = category_id
+        for r in range(NUM_ROWS):
+            ax = grid[r * NUM_COLUMNS + i]
+            # print(f'image {} at grid {r*NUM_COLUMNS + i}')
+            img = img_list[(i * NUM_ROWS) + r]
+            ax.imshow(img / 255.0)
+            ax.axis("off")
+            if r == 0:
+                print(categories[i])
+                ax.text(0.5, 0.5, categories[i], fontsize="medium")
+    plt.show()
+
+
+def set_figsize(figsize=(3.5, 2.5)):
+    """Set the figure size for matplotlib."""
+    plt.rcParams["figure.figsize"] = figsize
+
+
+def set_axes(axes, xlabel, ylabel, xlim, ylim, xscale, yscale, legend):
+    """Set the axes for matplotlib."""
+    axes.set_xlabel(xlabel), axes.set_ylabel(ylabel)
+    axes.set_xscale(xscale), axes.set_yscale(yscale)
+    axes.set_xlim(xlim), axes.set_ylim(ylim)
+    if legend:
+        axes.legend(legend)
+    axes.grid()
+
+
+def plot_graph(
+    X,
+    Y=None,
+    xlabel=None,
+    ylabel=None,
+    legend=[],
+    xlim=None,
+    ylim=None,
+    xscale="linear",
+    yscale="linear",
+    fmts=("-", "m--", "g-.", "r:"),
+    figsize=(3.5, 2.5),
+    axes=None,
+):
+    """Plot data points."""
+
+    def has_one_axis(X):  # True if X (tensor or list) has 1 axis
+        return (
+            hasattr(X, "ndim")
+            and X.ndim == 1
+            or isinstance(X, list)
+            and not hasattr(X[0], "__len__")
+        )
+
+    if has_one_axis(X):
+        X = [X]
+    if Y is None:
+        X, Y = [[]] * len(X), X
+    elif has_one_axis(Y):
+        Y = [Y]
+    if len(X) != len(Y):
+        X = X * len(Y)
+
+    set_figsize(figsize)
+    if axes is None:
+        axes = plt.gca()
+    axes.cla()
+    for x, y, fmt in zip(X, Y, fmts):
+        axes.plot(x, y, fmt) if len(x) else axes.plot(y, fmt)
+    set_axes(axes, xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
+    plt.show()
+
+
+def show_heatmaps(
+    matrices, xlabel, ylabel, titles=None, figsize=(2.5, 2.5), cmap="Reds"
+):
+    """Show heatmaps of matrices."""
+    num_rows, num_cols, _, _ = matrices.shape
+    fig, axes = plt.subplots(
+        num_rows, num_cols, figsize=figsize, sharex=True, sharey=True, squeeze=False
+    )
+    for i, (row_axes, row_matrices) in enumerate(zip(axes, matrices)):
+        for j, (ax, matrix) in enumerate(zip(row_axes, row_matrices)):
+            pcm = ax.imshow(matrix.detach().numpy(), cmap=cmap)
+            if i == num_rows - 1:
+                ax.set_xlabel(xlabel)
+            if j == 0:
+                ax.set_ylabel(ylabel)
+            if titles:
+                ax.set_title(titles[j])
+    fig.colorbar(pcm, ax=axes, shrink=0.6)
+    plt.show()
+
+
+class ProgressBoard:
+    """The board that plots data points in animation."""
+
+    def __init__(
+        self,
+        xlabel=None,
+        ylabel=None,
+        xlim=None,
+        ylim=None,
+        xscale="linear",
+        yscale="linear",
+        ls=["-", "--", "-.", ":"],
+        colors=["C0", "C1", "C2", "C3"],
+        fig=None,
+        axes=None,
+        figsize=(3.5, 2.5),
+        display=True,
+    ):
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+        self.xlim = xlim
+        self.ylim = ylim
+        self.xscale = xscale
+        self.yscale = yscale
+        self.ls = ls
+        self.colors = colors
+        self.fig = fig
+        self.axes = axes
+        self.figsize = figsize
+        self.display = display
+        plt.ion()
+
+    def draw(self, x, y, label, every_n=1):
+        Point = collections.namedtuple("Point", ["x", "y"])
+        if not hasattr(self, "raw_points"):
+            self.raw_points = collections.OrderedDict()
+            self.data = collections.OrderedDict()
+        if label not in self.raw_points:
+            self.raw_points[label] = []
+            self.data[label] = []
+        points = self.raw_points[label]
+        line = self.data[label]
+        points.append(Point(x, y))
+        if len(points) != every_n:
+            return
+        mean = lambda x: sum(x) / len(x)
+        line.append(Point(mean([p.x for p in points]), mean([p.y for p in points])))
+        points.clear()
+        if not self.display:
+            return
+        if self.fig is None:
+            self.fig = plt.figure(figsize=self.figsize)
+        plt_lines, labels = [], []
+        for (k, v), ls, color in zip(self.data.items(), self.ls, self.colors):
+            plt_lines.append(
+                plt.plot([p.x for p in v], [p.y for p in v], linestyle=ls, color=color)[
+                    0
+                ]
+            )
+            labels.append(k)
+        axes = self.axes if self.axes else plt.gca()
+        if self.xlim:
+            axes.set_xlim(self.xlim)
+        if self.ylim:
+            axes.set_ylim(self.ylim)
+        if not self.xlabel:
+            self.xlabel = self.x
+        axes.set_xlabel(self.xlabel)
+        axes.set_ylabel(self.ylabel)
+        axes.set_xscale(self.xscale)
+        axes.set_yscale(self.yscale)
+        axes.legend(plt_lines, labels)
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def save_fig(self, name="temp", dir="./"):
+        self.fig.savefig(name + ".png")
+
+
+
+
+class Accumulator:
+    """For accumulating sums over `n` variables."""
+
+    def __init__(self, n):
+        self.data = [0.0] * n
+
+    def add(self, *args):
+        self.data = [a + float(b) for a, b in zip(self.data, args)]
+
+    def reset(self):
+        self.data = [0.0] * len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value (moving average)"""
+
+    def __init__(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def reset(self):
+        self.last_val = self.val
+        self.last_avg = self.avg
+        self.last_sum = self.sum
+        self.last_count = self.count
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __repr__(self):
+        return "{:.3f} ({:.3f})".format(self.val, self.avg)
+
+
+def plot_to_tensorboard(writer, fig, tag, step):
+    """
+    Log a Matplotlib figure to TensorBoard.
+
+    Parameters:
+    - writer: Instance of SummaryWriter.
+    - fig: Matplotlib figure.
+    - tag: Name of the image in TensorBoard.
+    - step: Training step or epoch.
+    """
+    # Convert Matplotlib figure to a numpy array
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    img = Image.open(buf)
+    img_array = np.array(img)
+
+    # Convert numpy array to tensor
+    img_tensor = torch.tensor(img_array).permute(2, 0, 1)
+
+    # Add image to TensorBoard
+    writer.add_image(tag, img_tensor, step)
+    
+    
+def describe_structure(obj, depth=0):
+    """ Recursively describe the structure of a variable, printing data types instead of values. """
+    indent = "  " * depth  # Indentation for readability
+    
+    if isinstance(obj, dict):
+        print(f"{indent}dict {{")
+        for key, value in obj.items():
+            print(f"{indent}  {repr(key)}: ", end="")
+            describe_structure(value, depth + 1)
+        print(f"{indent}}}")
+    
+    elif isinstance(obj, list):
+        print(f"{indent}list [")
+        if obj:  # If the list has elements, describe the first one
+            print(f"{indent}  (example item) ", end="")
+            describe_structure(obj[0], depth + 1)
+        print(f"{indent}]")
+    
+    elif isinstance(obj, tuple):
+        print(f"{indent}tuple (")
+        if obj:  # If the tuple has elements, describe the first one
+            print(f"{indent}  (example item) ", end="")
+            describe_structure(obj[0], depth + 1)
+        print(f"{indent})")
+    
+    elif isinstance(obj, set):
+        print(f"{indent}set {{")
+        if obj:  # If the set has elements, describe the first one
+            print(f"{indent}  (example item) ", end="")
+            describe_structure(next(iter(obj)), depth + 1)
+        print(f"{indent}}}")
+    
+    else:
+        print(f"{indent}{type(obj).__name__}")
+
+
+
+def plot_confusion_matrix(cm, class_names=None, title='Confusion Matrix', color_map='Blues', figsize=(8, 6), color_bar=False, 
+                            x_label=None, y_label=None, vmin=None, vmax=None, tick_label_font_size=None,
+                            filepath=None, show=True):
+    """
+    Plots the confusion matrix (for integers) or a similarity matrix (for floats)
+    and optionally saves it to a file and/or displays it.
+
+    Args:
+        cm (np.ndarray or torch.Tensor): The matrix to plot (2D numpy array or torch tensor).
+        class_names (list, optional): A list of class names to display on the axes.
+                                        If None, will use 0, 1, 2...
+        title (str): The title of the plot.
+        color_map (str): Colormap to use for the heatmap. Defaults to 'Blues'.
+        color_bar (bool): If True, a color bar will be displayed. Defaults to False.
+        filepath (str, optional): The path and filename to save the plot.
+                                   If None, the plot will not be saved.
+        show (bool): If True, the plot will be displayed to the user. Defaults to True.
+        vmin (float, optional): The minimum value for the colormap. If provided, overrides
+                                  automatic scaling for the colormap. Useful for fixing the
+                                  range for similarity matrices (e.g., -1 to 1).
+        vmax (float, optional): The maximum value for the colormap. If provided, overrides
+                                  automatic scaling for the colormap. Useful for fixing the
+                                  range for similarity matrices (e.g., -1 to 1).
+    """
+    if filepath is None and not show:
+        print("Warning: Neither 'filepath' is provided nor 'show' is set to True. The plot will not be saved or displayed.")
+        return
+
+    # Convert torch tensor to numpy array if it's a torch tensor
+    if isinstance(cm, torch.Tensor):
+        # Move to CPU if it's on GPU, then convert to numpy
+        cm_np = cm.detach().cpu().numpy()
+    else:
+        cm_np = cm # Assume it's already a numpy array
+
+    # Determine the format string based on the data type of the matrix
+    if np.issubdtype(cm_np.dtype, np.integer):
+        fmt = 'd'  # Integer format for confusion matrices
+        # For integer matrices, if vmin/vmax are not explicitly set, let seaborn determine them
+        # However, if they are set, apply them
+        if vmin is None:
+            vmin_effective = cm_np.min()
+        else:
+            vmin_effective = vmin
+        if vmax is None:
+            vmax_effective = cm_np.max()
+        else:
+            vmax_effective = vmax
+
+    elif np.issubdtype(cm_np.dtype, np.floating):
+        fmt = '.2f'  # Float format with 2 decimal places for similarity matrices
+        # For float matrices, if vmin/vmax are not explicitly set, use the matrix's min/max
+        if vmin is None:
+            vmin_effective = cm_np.min()
+        else:
+            vmin_effective = vmin
+        if vmax is None:
+            vmax_effective = cm_np.max()
+        else:
+            vmax_effective = vmax
+    else:
+        # Fallback for other types, or raise an error if unsupported
+        fmt = '.2f' # Default to float format for safety
+        if vmin is None:
+            vmin_effective = cm_np.min()
+        else:
+            vmin_effective = vmin
+        if vmax is None:
+            vmax_effective = cm_np.max()
+        else:
+            vmax_effective = vmax
+
+    plt.figure(figsize=figsize)
+    
+    # Use vmin_effective and vmax_effective for the color mapping
+    ax = sns.heatmap(cm_np, annot=True, fmt=fmt, cmap=color_map, cbar=color_bar,
+                xticklabels=class_names, yticklabels=class_names,
+                vmin=vmin_effective, vmax=vmax_effective)
+    
+    # Set font size for xticklabels and yticklabels
+    if tick_label_font_size is not None:
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=tick_label_font_size)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, va='center', fontsize=tick_label_font_size)
+    
+    plt.title(title)
+    # Adjust labels based on whether it's integer (likely confusion matrix) or float (likely similarity)
+    if x_label:
+        plt.xlabel(x_label)
+    if y_label:
+        plt.ylabel(y_label)
+    
+    
+    plt.tight_layout()
+
+    if filepath:
+        plt.savefig(filepath, dpi=300)
+    
+    if show:
+        plt.show()
+    
+    plt.close()
+
+    
+    
+    
+def plot_multiple_confusion_matrices(
+    filepaths,
+    titles=None,
+    results=None,
+    main_title='Combined Confusion Matrices',
+    save_filepath=None,
+    show=True
+):
+    """
+    Combines and displays multiple confusion matrix plots vertically in a single figure,
+    with an optional table of performance results at the bottom.
+
+    Args:
+        filepaths (list): A list of paths to the confusion matrix images.
+        titles (list, optional): A list of titles for each confusion matrix.
+                                 Must be the same length as filepaths.
+        results (list, optional): A list of dictionaries, where each dictionary
+                                  specifies the performance metrics for a model
+                                  associated with a confusion matrix.
+                                  Each dictionary should be in the format:
+                                  {'ACC': float, 'Loss': float, 'F1': float}.
+                                  Must be the same length as filepaths.
+        main_title (str): Overall title for the combined figure. Defaults to 'Combined Confusion Matrices'.
+        save_filepath (str, optional): Path to save the combined figure. If None, the figure is not saved.
+        show (bool): If True, display the combined figure. Defaults to True.
+    """
+    num_matrices = len(filepaths)
+    if titles and len(titles) != num_matrices:
+        raise ValueError("The number of titles must match the number of filepaths.")
+    if results and len(results) != num_matrices:
+        raise ValueError("The number of results dictionaries must match the number of filepaths.")
+
+    images = []
+    try:
+        for fp in filepaths:
+            images.append(Image.open(fp))
+    except FileNotFoundError as e:
+        print(f"Error: One or more confusion matrix image files not found. {e}")
+        return
+
+    # Determine figure height based on number of matrices and if a table is included
+    fig_height_per_matrix = 6
+    table_height = 0
+    if results:
+        # Estimate height needed for the table (adjust as needed for more padding)
+        table_height = 0.6 * len(results) + 1.8 # Increased basic estimate per row + header
+        fig, axes = plt.subplots(num_matrices + 1, 1, figsize=(10, num_matrices * fig_height_per_matrix + table_height))
+    else:
+        fig, axes = plt.subplots(num_matrices, 1, figsize=(10, num_matrices * fig_height_per_matrix))
+
+
+    for i, img in enumerate(images):
+        axes[i].imshow(img)
+        axes[i].axis('off')  # Turn off axis labels and ticks for the image
+        if titles and titles[i]:
+            axes[i].text(-0.1, 0.5, titles[i], transform=axes[i].transAxes,
+                         fontsize=12, va='center', ha='right', rotation=90) # Vertical title on the left
+
+    if results:
+        # Prepare data for the table
+        df = pd.DataFrame(results)
+        # Add a 'Model' column for row labels if titles are provided
+        if titles:
+            df.insert(0, 'Model', titles)
+        else:
+            df.insert(0, 'Model', [f'Model {j+1}' for j in range(num_matrices)])
+
+        # Format numerical columns to 3 decimal places
+        for col in df.columns:
+            # Check if the column can be converted to numeric before formatting
+            # This avoids errors if 'Model' column or other non-numeric columns are present
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].apply(lambda x: f"{x:.3f}")
+
+        # Create the table
+        table_ax = axes[-1] # The last subplot for the table
+        table_ax.axis('off') # Turn off axis for the table plot
+        
+        # Adjust column widths dynamically
+        num_columns = len(df.columns)
+        col_widths = [1.0 / num_columns] * num_columns
+
+        table = table_ax.table(cellText=df.values,
+                               colLabels=df.columns,
+                               loc='center',
+                               cellLoc='center',
+                               colWidths=col_widths)
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 1.5) # Adjust table scale for more vertical padding (increased from 1.2 to 1.5)
+
+        # Corrected way to set specific cell properties for padding
+        for key, cell in table.get_celld().items():
+            cell.set_height(0.1)  # You can adjust this value to control vertical padding
+
+    fig.suptitle(main_title, fontsize=16, y=0.99 if results else 1.02) # Overall title at the top, adjusted if table exists
+    plt.tight_layout(rect=[0.05, 0.03, 1, 0.96 if results else 0.98]) # Adjust layout to make space for main title and side titles and potentially table
+
+    if save_filepath:
+        plt.savefig(save_filepath, bbox_inches='tight')
+
+    if show:
+        plt.show()
+    
+    plt.close() # Close the figure to free memory
