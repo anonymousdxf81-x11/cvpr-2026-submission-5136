@@ -1,8 +1,28 @@
 # CUTS: Corrective Unlearning in Task Space (CVPR 2026 Submission ID 5136)
+### Implementation of *"Subtract the Corruption: Training-Data-Free Corrective Machine Unlearning using Task Arithmetic"*
 
 This repository contains the implementation of CUTS, a training-data-free
 corrective machine unlearning method that uses task arithmetic to remove
 the effect of label noise and backdoor triggers from trained models.
+
+<div align="center" style="margin-top: 16px; margin-bottom: 8px;">
+  <p><b>PCA trajectory of the penultimate features during CUTS correction.</b></p>
+  <img src="media/pca_evol.gif" width="800" alt="Merged GIF"/>
+</div>
+
+<table align="center" width="800">
+  <tr>
+    <td align="center"><b>(a) CIFAR10</b></td>
+    <td align="center"><b>(b) MNIST</b></td>
+    <td align="center"><b>(c) CIFAR10</b></td>
+  </tr>
+  <tr>
+    <td align="center">60% Symmetric Noise</td>
+    <td align="center">40% Symmetric Noise</td>
+    <td align="center">2% Poison Trigger</td>
+  </tr>
+</table>
+
 
 ## Repository structure
 
@@ -48,6 +68,6 @@ python run_experiment.py --experiment <noise or poison> --arch <clip or dino or 
 
 if you are running for a real-world dataset like `Clothing1M`, use with `--real-world` and to run with Pytorch DDP
 ```bash
-CUDA_VISIBLE_DEVICES=<gpu IDs> torchrun --nproc_per_node=<num processes> run_experiment.py -e noise -a dino --real-world -c <config name> -f -t
+CUDA_VISIBLE_DEVICES=<gpu IDs> torchrun --nproc_per_node=<num processes> run_experiment.py -e noise -a <clip or dino or regular> --real-world -c <config name> -f -t
 ```
 
