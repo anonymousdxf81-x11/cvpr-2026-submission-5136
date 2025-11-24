@@ -78,6 +78,11 @@ class Clothing1M(BaseClassificationDataset):
         self.dataset_dir = dataset_dir
     
     
+        self.train_noisy_dir = self.dataset_dir / 'noisy_train'
+        self.train_clean_dir = self.dataset_dir / 'clean_train'
+        self.val_dir = self.dataset_dir / 'val'
+        self.test_dir = self.dataset_dir / 'test'
+    
         if self.is_distributed():
             if self.is_node_leader():
                 self._download_dataset()
@@ -168,10 +173,6 @@ class Clothing1M(BaseClassificationDataset):
     
     def _download_dataset(self):
         
-        self.train_noisy_dir = self.dataset_dir / 'noisy_train'
-        self.train_clean_dir = self.dataset_dir / 'clean_train'
-        self.val_dir = self.dataset_dir / 'val'
-        self.test_dir = self.dataset_dir / 'test'
         
         if self.train_clean_dir.exists() and self.train_noisy_dir.exists() and self.val_dir.exists() and self.test_dir.exists():
             return
