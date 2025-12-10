@@ -1,4 +1,4 @@
-# CUTS: Corrective Unlearning in Task Space (CVPR 2026 Submission ID 5136)
+# CUTS: Corrective Unlearning in Task Space
 ### Implementation of *"Subtract the Corruption: Training-Data-Free Corrective Machine Unlearning using Task Arithmetic"*
 
 This repository contains the implementation of CUTS, a training-data-free
@@ -35,8 +35,8 @@ the effect of label noise and backdoor triggers from trained models.
 ## Installation and Requirements
 Install the requirements by:
 ```bash
-git clone https://github.com/anonymousdxf81-x11/cvpr-2026-submission-5136.git
-cd cvpr-2026-submission-5136
+git clone https://github.com/anonymousdxf81-x11/CVPR-CUTS.git
+cd CVPR-CUTS
 pip install -r requirements.txt
 ```
 
