@@ -59,7 +59,6 @@ def logits_from_features(classifier: nn.Module, feats: torch.Tensor, bs: int = 4
     return torch.cat(outs, dim=0)
 
 
-
 def _knn_indices(feats_np: np.ndarray, k: int):
     from sklearn.neighbors import NearestNeighbors
     k_eff = min(k + 1, len(feats_np))
